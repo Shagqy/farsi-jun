@@ -722,31 +722,31 @@ NUR JSON:
 }
 
 
-// ---------- LOGIN ----------
+// ---------- LOGIN (E-Mail + Passwort) ----------
 function vLogin(){
- const L = V.login || (V.login = {step:"mail"});
+ const L = V.login || (V.login = {mode:"in"});
+ const up = L.mode==="up";
  return `<div style="text-align:center;padding:40px 8px 10px"><div style="font-size:64px">🌸</div><div class="logo" style="font-size:34px">Farsi<b>Jun</b></div><p class="mut">Iranisches Alltagsfarsi in 12 Monaten</p></div>
- <div class="card">${L.step==="mail" ? `<h3>Anmelden</h3><p class="sm mut">Wir schicken dir einen 6-stelligen Code per E-Mail. Kein Passwort nötig.</p>
-  <input class="inp" id="lgMail" type="email" autocomplete="email" placeholder="deine@email.de" value="${h(L.mail||"")}">
-  <button class="btn full" style="margin-top:10px" data-act="sendCode" ${L.busy?"disabled":""}>${L.busy?'<span class="spin"></span>':"Code senden"}</button>`
- : `<h3>Code eingeben</h3><p class="sm mut">Wir haben einen Code an <b>${h(L.mail)}</b> geschickt.</p>
-  <input class="inp" id="lgCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" style="font-size:24px;letter-spacing:6px;text-align:center">
-  <button class="btn full" style="margin-top:10px" data-act="verifyCode" ${L.busy?"disabled":""}>${L.busy?'<span class="spin"></span>':"Anmelden"}</button>
-  <button class="btn gh full" data-act="tab" data-a="login">Andere E-Mail</button>`}
- ${L.err?`<div class="note red">${h(L.err)}</div>`:""}</div>`;
+ <div class="card"><h3>${up?"Konto erstellen":"Anmelden"}</h3>
+  <input class="inp" id="lgMail" type="email" autocomplete="email" placeholder="E-Mail" value="${h(L.mail||"")}">
+  <input class="inp" id="lgPw" type="password" autocomplete="${up?"new-password":"current-password"}" placeholder="Passwort${up?" (mind. 8 Zeichen)":""}" style="margin-top:8px">
+  <button class="btn full" style="margin-top:10px" data-act="${up?"signUp":"signIn"}" ${L.busy?"disabled":""}>${L.busy?'<span class="spin"></span>':up?"Konto erstellen":"Anmelden"}</button>
+  <button class="btn gh full" data-act="loginMode">${up?"Ich habe schon ein Konto":"Neu hier? Konto erstellen"}</button>
+  ${L.err?`<div class="note red">${h(L.err)}</div>`:""}${L.info?`<div class="note tq">${h(L.info)}</div>`:""}</div>`;
 }
-async function sendCode(){
- const mail=$("#lgMail").value.trim(); if(!/^\S+@\S+\.\S+$/.test(mail)) { V.login.err="Bitte eine gültige E-Mail eingeben."; return render(); }
- V.login={step:"mail", mail, busy:true}; render();
- const {error} = await SB.auth.signInWithOtp({email:mail, options:{shouldCreateUser:true}});
- V.login = error ? {step:"mail", mail, err:"Senden hat nicht geklappt: "+error.message} : {step:"code", mail}; render();
-}
-async function verifyCode(){
- const token=$("#lgCode").value.replace(/\D/g,""); const mail=V.login.mail; if(token.length<6) return;
- V.login.busy=true; V.login.err=null; render();
- const {data, error} = await SB.auth.verifyOtp({email:mail, token, type:"email"});
- if (error) { V.login={step:"code", mail, err:"Code ungültig oder abgelaufen."}; return render(); }
+function loginInput(){ const mail=$("#lgMail").value.trim(), pw=$("#lgPw").value; if(!/^\S+@\S+\.\S+$/.test(mail)) { V.login.err="Bitte eine gültige E-Mail eingeben."; render(); return null; } if(pw.length<8){ V.login.mail=mail; V.login.err="Das Passwort braucht mindestens 8 Zeichen."; render(); return null; } return {mail,pw}; }
+async function signIn(){
+ const x=loginInput(); if(!x) return; V.login={mode:"in", mail:x.mail, busy:true}; render();
+ const {data, error} = await SB.auth.signInWithPassword({email:x.mail, password:x.pw});
+ if (error) { V.login={mode:"in", mail:x.mail, err: /confirm/i.test(error.message) ? "E-Mail noch nicht bestätigt – in Supabase „Confirm email“ ausschalten (siehe Anleitung)." : "E-Mail oder Passwort falsch."}; return render(); }
  await onLogin(data.user);
+}
+async function signUp(){
+ const x=loginInput(); if(!x) return; V.login={mode:"up", mail:x.mail, busy:true}; render();
+ const {data, error} = await SB.auth.signUp({email:x.mail, password:x.pw});
+ if (error) { V.login={mode:"up", mail:x.mail, err: /registered|exists/i.test(error.message) ? "Dieses Konto gibt es schon – bitte anmelden." : "Konto erstellen hat nicht geklappt: "+error.message}; return render(); }
+ if (data.session) return onLogin(data.user);
+ V.login={mode:"in", mail:x.mail, info:"Konto erstellt. Falls keine Anmeldung möglich ist: In Supabase unter Authentication → Sign In / Providers → Email „Confirm email“ ausschalten."}; render();
 }
 
 // ---------- Aktionen ----------
@@ -793,8 +793,9 @@ const ACT = {
  testGo: () => testGo(),
  rec: (a, el) => toggleRec(a, el.dataset.k),
  logout: () => logout(),
- sendCode: () => sendCode(),
- verifyCode: () => verifyCode(),
+ signIn: () => signIn(),
+ signUp: () => signUp(),
+ loginMode: () => { const L=V.login||{}; V.login={mode: L.mode==='up'?'in':'up', mail: ($('#lgMail')||{}).value||''}; render(); },
  reset: () => { S=DEF(); save(true); go("home"); toast("Zurückgesetzt."); }
 };
 document.addEventListener("click", e => { const el=e.target.closest("[data-act]"); if (!el || el.disabled) return; if (el.tagName==="INPUT") return; const f=ACT[el.dataset.act]; if (f) { e.preventDefault(); f(el.dataset.a, el); } });
@@ -804,7 +805,7 @@ document.addEventListener("change", async e => {
  if (el.dataset.rec && el.files[0]) { const k=el.dataset.rec; try { await saveRecording(k, el.files[0]); toast("Aufnahme gespeichert – wird ab jetzt abgespielt ✓"); render(); } catch(err){ toast("Speichern hat nicht geklappt."); } }
  if (el.dataset.shadow && el.files[0]) { V.myRec = URL.createObjectURL(el.files[0]); render(); }
 });
-document.addEventListener("keydown", e => { if (e.key!=="Enter") return; if (e.target.id==="lgMail") sendCode(); if (e.target.id==="lgCode") verifyCode(); });
+document.addEventListener("keydown", e => { if (e.key!=="Enter") return; if (e.target.id==="lgMail"||e.target.id==="lgPw") (V.login&&V.login.mode==="up"?signUp:signIn)(); });
 document.addEventListener("input", e => { if (e.target.dataset.actInput==="vq") { V.vq=e.target.value; const pos=e.target.selectionStart; render(); const n=$("#vq"); n.focus(); n.setSelectionRange(pos,pos); } });
 // Session-Schritte für Karten
 addEventListener("hashchange", () => { if (V.tab==="login") return; const t=location.hash.slice(1); if (TABS.some(x=>x[0]===t) && V.tab!==t) go(t); });

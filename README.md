@@ -22,14 +22,9 @@ Alle API-Schlüssel liegen nur auf dem Server, nie im Frontend.
 ### 1. Supabase (Login + Fortschritt + Aufnahmen) – kostenlos
 1. Auf https://supabase.com ein Projekt anlegen (Region z. B. Frankfurt).
 2. **SQL Editor** → Inhalt von `supabase/schema.sql` einfügen → *Run*.
-3. **Authentication → Email Templates**: In **beiden** Vorlagen **„Confirm signup“** (erste Anmeldung) und **„Magic Link“** (jede weitere) den Code einfügen, z. B.:
-   ```html
-   <h2>Dein Code für Farsi Jun</h2>
-   <p style="font-size:28px;letter-spacing:4px"><b>{{ .Token }}</b></p>
-   ```
-   Wichtig: Die App arbeitet mit dem 6-stelligen Code statt mit einem Link, weil Links auf dem iPhone in Safari statt in der installierten App aufgehen.
+3. **Authentication → Sign In / Providers → Email**: **„Confirm email“ ausschalten** und speichern. Die App nutzt E-Mail + Passwort, es werden keine E-Mails verschickt.
 4. **Project Settings → API**: `Project URL` und `anon public` Key notieren.
-5. Optional, wenn ihr beide angemeldet seid: **Authentication → Sign In / Providers → „Allow new users to sign up“** ausschalten.
+5. Wenn ihr beide ein Konto habt: unter **Authentication → Sign In / Providers** „Allow new users to sign up“ ausschalten.
 
 > Hinweis: Kostenlose Supabase-Projekte pausieren nach etwa 1 Woche ohne Nutzung. Bei täglichem Lernen passiert das nicht. Falls doch, im Dashboard auf „Restore“ klicken.
 
@@ -77,7 +72,7 @@ Den Ordner in ein (privates) GitHub-Repo pushen. Danach auf vercel.com → *Add 
 ### 6. Aufs Handy
 - **iPhone:** Link in **Safari** öffnen → Teilen-Symbol → **„Zum Home-Bildschirm“**. Dann startet die App wie eine normale App, ohne Browserleiste.
 - **Android:** Link in Chrome öffnen → Menü → **„App installieren“**.
-- Mit ihrer E-Mail anmelden und den Code eingeben. Beim ersten Sprechen fragt das Handy nach dem Mikrofon: erlauben.
+- „Konto erstellen“ antippen, E-Mail und Passwort eingeben. Beim ersten Sprechen fragt das Handy nach dem Mikrofon: erlauben.
 
 Der Fortschritt hängt am Konto und funktioniert auf allen Geräten.
 
