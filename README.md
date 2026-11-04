@@ -33,8 +33,8 @@ Ohne `ANTHROPIC_API_KEY` nutzt die App für die KI automatisch den `OPENAI_API_K
 1. Auf https://console.anthropic.com einen API-Key erstellen und Guthaben aufladen.
 2. **Unbedingt ein monatliches Ausgabenlimit setzen** (Settings → Limits).
 
-### 3. Azure Speech (persische Stimme) – sehr empfohlen
-Ohne diesen Schritt nutzt die App die Stimme des Handys. Auf iPhones gibt es meist keine persische Stimme.
+### 3. Azure Speech (persische Stimme) – empfohlen
+Ohne Azure nutzt die App die OpenAI-Stimme (falls `OPENAI_API_KEY` gesetzt ist). Die klingt gut, ist aber keine echte iranische Stimme. Azure hat echte fa-IR-Stimmen und eine kostenlose Stufe.
 1. Im Azure-Portal eine Ressource vom Typ **Speech** anlegen, Preisstufe **Free F0** (500.000 Zeichen pro Monat gratis), Region z. B. `westeurope`.
 2. Unter *Keys and Endpoint* den Key und die Region notieren.
 3. Die Stimme ist `fa-IR-DilaraNeural` (weiblich). Männlich wäre `fa-IR-FaridNeural`.
