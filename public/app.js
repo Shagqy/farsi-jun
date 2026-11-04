@@ -75,9 +75,11 @@ async function flush(){
 async function initCloud(){
  try { CFG = await (await fetch("/api/config", {cache:"no-store"})).json(); } catch(e){ CFG={}; }
  if (CFG.supabaseUrl && window.supabase) {
-  SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {auth:{persistSession:true, autoRefreshToken:true}});
-  const {data:{session}} = await SB.auth.getSession();
-  if (session) await onLogin(session.user); else { V={tab:"login"}; render(); }
+  try {
+   SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {auth:{persistSession:true, autoRefreshToken:true}});
+   const {data:{session}} = await SB.auth.getSession();
+   if (session) await onLogin(session.user); else { V={tab:"login"}; render(); }
+  } catch(e){ SB=null; console.error(e); toast("Anmeldung nicht verfügbar – Supabase-Einstellungen prüfen."); AI_OK=false; render(); }
  } else { AI_OK = !!CFG.ai; render(); } // lokaler Modus ohne Konto
 }
 async function onLogin(u){

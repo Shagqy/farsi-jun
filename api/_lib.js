@@ -1,9 +1,17 @@
 // Gemeinsame Hilfen für alle API-Funktionen
 
+// Akzeptiert die volle URL oder nur die Projekt-ID (z. B. "abcd1234") und macht daraus https://abcd1234.supabase.co
+export function supabaseUrl() {
+  let u = String(process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  if (!u) return "";
+  if (!/^https?:\/\//i.test(u)) u = u.includes(".") ? "https://" + u : "https://" + u + ".supabase.co";
+  return u;
+}
+
 // Prüft das Supabase-Login-Token und (optional) die erlaubten E-Mails.
 // Ohne SUPABASE_URL (lokale Entwicklung) ist kein Login nötig.
 export async function requireUser(req, res) {
-  const url = process.env.SUPABASE_URL, anon = process.env.SUPABASE_ANON_KEY;
+  const url = supabaseUrl(), anon = String(process.env.SUPABASE_ANON_KEY || "").trim();
   if (!url) return { id: "local", email: "local" };
   const token = String(req.headers.authorization || "").replace(/^Bearer /i, "");
   if (!token) { res.status(401).json({ error: "login" }); return null; }

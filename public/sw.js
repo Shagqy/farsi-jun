@@ -1,5 +1,5 @@
 // Service Worker: App-Dateien offline verfügbar halten (Netzwerk zuerst, sonst Cache).
-const CACHE = "farsi-jun-v2";
+const CACHE = "farsi-jun-v3";
 const SHELL = ["/", "/index.html", "/styles.css", "/data.js", "/app.js", "/manifest.webmanifest", "/icon-192.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
