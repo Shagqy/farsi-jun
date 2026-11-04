@@ -1,0 +1,13 @@
+{
+  "name": "farsi-jun",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Persisch-Lern-App: iranisches Alltagsfarsi in 12 Monaten",
+  "scripts": {
+    "dev": "node dev-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
