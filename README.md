@@ -28,7 +28,8 @@ Alle API-Schlüssel liegen nur auf dem Server, nie im Frontend.
 
 > Hinweis: Kostenlose Supabase-Projekte pausieren nach etwa 1 Woche ohne Nutzung. Bei täglichem Lernen passiert das nicht. Falls doch, im Dashboard auf „Restore“ klicken.
 
-### 2. Anthropic (KI) – Pflicht
+### 2. KI: Anthropic **oder** OpenAI – Pflicht (eins von beiden)
+Ohne `ANTHROPIC_API_KEY` nutzt die App für die KI automatisch den `OPENAI_API_KEY` (Modell über `OPENAI_MODEL` änderbar, Standard `gpt-4.1-mini`). Für Claude:
 1. Auf https://console.anthropic.com einen API-Key erstellen und Guthaben aufladen.
 2. **Unbedingt ein monatliches Ausgabenlimit setzen** (Settings → Limits).
 
@@ -56,7 +57,7 @@ Dann im Vercel-Dashboard unter **Settings → Environment Variables** die Werte 
 
 | Variable | Wert |
 |---|---|
-| `ANTHROPIC_API_KEY` | aus Schritt 2 |
+| `ANTHROPIC_API_KEY` **oder** `OPENAI_API_KEY` | aus Schritt 2 / 4 |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | aus Schritt 1 |
 | `ALLOWED_EMAILS` | eure beiden E-Mail-Adressen, mit Komma getrennt |
 | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | aus Schritt 3 |
