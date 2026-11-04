@@ -136,7 +136,7 @@ async function recBlob(key){
  return b;
 }
 async function ttsBlob(text){
- const k="tts:"+text; let b=null; try { b = await idb.get(k); } catch(e){}
+ const k="tts:"+(CFG.ttsVoice||"")+":"+text; let b=null; try { b = await idb.get(k); } catch(e){}
  if (b) return b;
  const r = await api("/api/tts", {text}, true); b = await r.blob(); idb.set(k,b).catch(()=>{}); return b;
 }
