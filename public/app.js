@@ -325,24 +325,21 @@ function vHome(){
  const next = w.lessons.find(id=>!S.done[id]);
  const L = next ? getLesson(next) : null;
  const modeName = {min:"Minimum · 10 Min.", std:"Standard · 20–30 Min.", int:"Intensiv · 45–60 Min."};
+ const covers = [due?due+" Karten":"", ed?ed+" Fehler":""].filter(Boolean).join(" · ");
  return shell(`
  <div class="hero"><div class="row" style="position:relative;z-index:1">
   ${ring(m,10)}<div style="flex:1"><div style="font-weight:800;opacity:.9;font-size:14px">Heute</div>
   <div style="font-size:21px;font-weight:900;line-height:1.2">${m>=10?"Tagesziel geschafft! 🎉":m>0?"Weiter so – noch "+(10-m)+" Min.":"Salâm! Bereit für heute?"}</div>
   <div style="font-size:13px;opacity:.9;margin-top:4px">🔥 ${streak()} Tage Serie · ${totalMin()} Min. gesamt</div></div></div>
   <button class="btn full" data-act="startSession" style="margin-top:14px;background:#fff;color:var(--pri);box-shadow:0 4px 0 rgba(0,0,0,.15);position:relative;z-index:1">▶ Tagestraining starten</button>
+  <p class="sm" style="opacity:.9;margin:8px 4px 0;position:relative;z-index:1">${modeName[S.mode]}${covers?" · deckt "+covers+" ab":""} · <button data-act="toggleMode" style="color:#fff;text-decoration:underline;font-weight:800;font-size:13px">Modus ändern</button></p>
  </div>
- <div class="seg" style="margin-bottom:6px">${["min","std","int"].map(k=>`<button class="${S.mode===k?"on":""}" data-act="mode" data-a="${k}">${{min:"Minimum",std:"Standard",int:"Intensiv"}[k]}</button>`).join("")}</div>
- <p class="sm mut" style="margin:4px 4px 0">${modeName[S.mode]} – das Training passt sich deinem Stand an. Das Tagesziel zählt erst ab 10 echten Lernminuten.</p>
+ ${V.showMode?`<div class="seg" style="margin-bottom:6px">${["min","std","int"].map(k=>`<button class="${S.mode===k?"on":""}" data-act="mode" data-a="${k}">${{min:"Minimum",std:"Standard",int:"Intensiv"}[k]}</button>`).join("")}</div>`:""}
  ${wk?`<div class="note">🎯 Dein schwächster Bereich ist gerade <b>${wk[2]}</b> (${wk[1]} %). Das Tagestraining legt dort heute einen Schwerpunkt.</div>`:""}
  <h2>Dein Weg</h2>
  <button class="week" data-act="${L?"lesson":"tab"}" data-a="${L?L.id:"lernen"}">
   <div class="dot on">${w.n}</div><div style="flex:1"><div class="sm mut" style="font-weight:800">Monat ${w.m} · Woche ${w.n} von 52</div>
   <div style="font-weight:900">${L? h(L.title) : h(w.title)}</div><div class="sm mut">${L? h(L.goal) : (w.lessons[0][0]==="G" && !S.gen[w.lessons[0]] ? "Lektion wird beim Öffnen erstellt" : h(M.goal))}</div></div><span style="font-size:22px">›</span></button>
- <div class="grid2" style="margin-top:12px">
-  <button class="stat" data-act="cards" style="text-align:left"><span class="sm mut" style="font-weight:800">Fällig</span><b>${due}</b><span class="sm">Karten wiederholen</span></button>
-  <button class="stat" data-act="errfix" style="text-align:left"><span class="sm mut" style="font-weight:800">Fehler</span><b>${ed}</b><span class="sm">zum Üben fällig</span></button>
- </div>
  <h2>Dieser Monat</h2><div class="card">${calendar()}</div>
  ${m<10?`<div class="note tq">⏰ Erinnerung: Heute fehlen noch ${10-m} Minuten bis zum Tagesziel.</div>`:""}
  <p class="sm mut" style="text-align:center;margin-top:18px">${cloudOk?"☁️ Fortschritt wird in deinem Konto gespeichert – auf allen Geräten":"💾 Fortschritt wird auf diesem Gerät gespeichert"}</p>
@@ -756,6 +753,7 @@ const ACT = {
  tab: a => { if (a==='login') { V={tab:'login'}; return render(); } go(a); },
  say: (a, el) => playKey(el.dataset.k, el.dataset.t),
  mode: a => { S.mode=a; save(); render(); },
+ toggleMode: () => { V.showMode=!V.showMode; render(); },
  script: (a, el) => { S.script = el.checked; save(); render(); },
  speed: a => { speed=a; stopAudio(); render(); },
  verify: a => { if (S.verified[a]) delete S.verified[a]; else S.verified[a]=true; save(); render(); },
