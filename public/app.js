@@ -54,12 +54,14 @@ const GRAMQ = [
 const DEF = () => ({v:1, created: Date.now(), mode:"std", script:true, srs:{}, days:{}, done:{}, listen:[], speak:[], quiz:[], errors:[], tests:{}, verified:{}, gen:{}, seen:{}, chats:0, lastNew:{} });
 let S = DEF();
 function getLesson(id){ id=String(id); if (id[0]==="G"||id[0]==="D") return S.gen[id] || null; return LESSONS.find(l => String(l.id)===id); }
-function lessonItems(id){ const L=getLesson(id); return L ? L.items.map((it,i)=>({key:id+"-"+i, lesson:id, f:it[0], d:it[1], p:it[2], ef:it[3], ed:it[4], ep:it[5], u:it[6], ai: id[0]==="G"})) : []; }
+function lessonItems(id){ const L=getLesson(id); return L ? L.items.map((it,i)=>it && ({key:id+"-"+i, lesson:id, f:it[0], d:it[1], p:it[2], ef:it[3], ed:it[4], ep:it[5], u:it[6], ai: id[0]==="G"})).filter(Boolean) : []; }
 function allItems(){ const out=[]; WEEKS.forEach(w=>w.lessons.forEach(id=>out.push(...lessonItems(id)))); return out; }
 const itemByKey = k => allItems().find(i => i.key===k);
 function curWeek(){ for (const w of WEEKS) if (!w.lessons.every(id => S.done[id])) return w; return WEEKS[WEEKS.length-1]; }
 function weekState(w){ const c=curWeek(); return w.lessons.every(id=>S.done[id]) ? "ok" : (w.n===c.n ? "on" : (w.n<c.n?"ok":"lock")); }
 function learnedItems(){ return allItems().filter(i => S.srs["p:"+i.key]); }
+// Anteil der Ausdrücke einer Lektion, die schon gelernt sind (extra = Schlüssel, die gleich noch dazukommen)
+function lessonCoverage(id, extra){ const its=lessonItems(id); if (!its.length) return 1; return its.filter(i => S.srs["p:"+i.key] || (extra && extra.has(i.key))).length / its.length; }
 
 // ---------- Speicherung (Supabase + lokal) ----------
 let CFG={}, SB=null, USER=null, AI_OK=false, cloudOk=false, saveT=null, saving=false, dirty=false;
@@ -355,7 +357,7 @@ function vLernen(){
   return `<details class="card" ${open?"open":""}><summary><div class="row"><div class="dot ${M.m<cw.m?"ok":M.m===cw.m?"on":""}">${M.m}</div><div style="flex:1"><div style="font-weight:900">${h(M.title)}</div><div class="sm mut">${h(M.goal)}</div></div>${S.tests[M.m]?`<span class="tag tq">Test ${S.tests[M.m].total}%</span>`:""}</div></summary>
   <div style="margin-top:10px">${ws.map(w => { const st=weekState(w); return `<div style="margin:10px 0"><div class="sm mut" style="font-weight:800">Woche ${w.n} · ${h(w.title)}</div>
    ${w.lessons.map(id => { const L=getLesson(id); const done=S.done[id]; const lock = st==="lock";
-    return `<button class="week" ${lock?"disabled style='opacity:.55'":""} data-act="lesson" data-a="${id}"><div class="dot ${done?"ok":st==="on"?"on":""}">${done?"✓":lock?"🔒":"▶"}</div><div style="flex:1"><div style="font-weight:800">${L?h(L.title):h(w.title)}</div><div class="sm mut">${L? L.items.length+" Ausdrücke · Dialog · Grammatik" : lock? "Wird freigeschaltet, wenn du hier ankommst" : "Wird mit KI passend zu deinem Stand erstellt"}${L&&id[0]==="G"?" · KI-generiert":""}</div></div></button>`; }).join("")}</div>`; }).join("")}
+    return `<button class="week" ${lock?"disabled style='opacity:.55'":""} data-act="lesson" data-a="${id}"><div class="dot ${done?"ok":st==="on"?"on":""}">${done?"✓":lock?"🔒":"▶"}</div><div style="flex:1"><div style="font-weight:800">${L?h(L.title):h(w.title)}</div><div class="sm mut">${L? L.items.filter(Boolean).length+" Ausdrücke · Dialog · Grammatik" : lock? "Wird freigeschaltet, wenn du hier ankommst" : "Wird mit KI passend zu deinem Stand erstellt"}${L&&id[0]==="G"?" · KI-generiert":""}</div></div></button>`; }).join("")}</div>`; }).join("")}
   <button class="btn ${testOk?"tq":"sec"} full" ${testOk?"":"disabled"} data-act="test" data-a="${M.m}">📝 ${M.m===12?"Abschlusstest":"Monatstest "+M.m}${testOk?"":" (nach Woche "+ws[ws.length-1].n+")"}</button></div></details>`; }).join("")}`);
 }
 function vLesson(){
@@ -440,8 +442,17 @@ function buildSession(){
  if (fresh.length) steps.push({t:"new", keys: fresh.slice(0,n.new), i:0});
  const dialogs = WEEKS.filter(x=>x.n<=w.n).flatMap(x=>x.lessons).filter(id=>getLesson(id)).map(String);
  const curL = w.lessons.find(id=>!S.done[id] && getLesson(id)) || dialogs[dialogs.length-1];
- const lisOrder = [curL, ...shuffle(dialogs.filter(d=>d!==curL))].filter(Boolean);
- for (let i=0;i<n.lis && i<lisOrder.length;i++) steps.push({t:"listen", id: lisOrder[i]});
+ // Hören nur mit Dialogen, deren Wörter schon gelernt sind (inkl. der neuen Ausdrücke aus diesem Training)
+ const planned = new Set(fresh.slice(0,n.new)); const cov = id => lessonCoverage(id, planned);
+ const lisPool = dialogs.filter(id => cov(id) >= 1);
+ const lisOrder = [lisPool.includes(curL) ? curL : null, ...shuffle(lisPool.filter(d=>d!==curL))].filter(Boolean);
+ const best = dialogs.filter(id => cov(id) > 0).sort((a,b)=>cov(b)-cov(a))[0];
+ const known = learnedItems().length + planned.size;
+ for (let i=0;i<n.lis;i++) {
+  if (i<lisOrder.length) steps.push({t:"listen", id: lisOrder[i]});
+  else if (AI_OK && known>=4) steps.push({t:"listen", gen:true, fallback: best});
+  else if (best && i===lisOrder.length) steps.push({t:"listen", id: best});
+ }
  const de = dueErrors(); if (n.err && de.length) steps.push({t:"errors", ids: de.slice(0,n.err).map(e=>e.id)});
  const spkL = dialogs.length ? [curL, ...shuffle(dialogs)].slice(0,n.spk) : [];
  spkL.forEach(id => steps.push({t:"speak", id}));
@@ -455,7 +466,11 @@ function vSession(){
  const head = pb + (label?`<div class="sm mut" style="font-weight:800;margin-bottom:6px">${label} · Schritt ${s.i+1} von ${s.steps.length-1}</div>`:"");
  if (st.t==="review") return head + cardUI(st);
  if (st.t==="new") { const it=itemByKey(st.keys[st.i]); return head + `<p class="sm mut">Hör dir den Ausdruck an und sprich ihn laut nach.</p>` + itemCard(it,{tools:false}) + `<button class="btn full" data-act="newNext">${st.i<st.keys.length-1?"Weiter":"Fertig"}</button>`; }
- if (st.t==="listen") return head + listenUI(st);
+ if (st.t==="listen" && st.gen && !st.id) {
+  if (!st.busy) { st.busy=true; makeDialog(true).then(id => { st.id=id; }).catch(() => { if (st.fallback) st.id=st.fallback; else st.skip=true; }).finally(() => { if (V.s===s) { if (st.skip) nextStep(); else render(); } }); }
+  return head + `<div class="card" style="text-align:center"><span class="spin"></span><p class="mut">Ein Dialog nur mit deinen gelernten Wörtern wird erstellt …</p></div>`;
+ }
+ if (st.t==="listen") return head + (getLesson(st.id)&&st.id[0]==="D"?`<span class="tag">KI-generiert</span>`:"") + listenUI(st);
  if (st.t==="errors") return head + errUI(st);
  if (st.t==="speak") { const L=getLesson(st.id); return head + `<div class="card"><h3>Deine Aufgabe</h3><p>${h(L.speak)}</p><p class="sm mut">Sprich es zuerst laut. Dann schreib oder diktiere es hier.</p></div>${checkerBox("lesson:"+st.id)}<button class="btn full ${V.check&&V.check.res?"":"sec"}" data-act="next">${V.check&&V.check.res?"Weiter":"Überspringen"}</button>`; }
  const m=todayMin();
@@ -475,16 +490,21 @@ function cardUI(st){
  const back = `<div style="height:1px;background:var(--line);width:100%;margin:6px 0"></div>${act?`${playBtn(it.key,it.p)}<div class="term">${h(it.f)}</div>${faText(it.p)}<div class="pron">🗣 ${h(pron(it.f))}</div>`:`<div style="font-size:20px;font-weight:900">${h(it.d)}</div>`}<p class="sm"><b>${h(it.ef)}</b><br><span class="mut">${h(it.ed)}</span></p>`;
  const c=S.srs[ck]; const iv = q => { if(q===0) return "10 Min."; const r=c.r+1, i= r===1?(q===3?3:1): r===2?(q===1?3:6): Math.round(c.i*c.e*(q===1?.8:q===3?1.3:1)); return i+(i===1?" Tag":" Tage"); };
  return `<div class="sm mut" style="text-align:right">${st.j+1} / ${st.cards.length}</div><div class="card fcard pop">${front}${flip?back:""}</div>
- ${flip?`<div class="rate">${[["Nochmal",0],["Schwer",1],["Gut",2],["Leicht",3]].map(r=>`<button data-act="rate" data-a="${r[1]}">${r[0]}<small>${iv(r[1])}</small></button>`).join("")}</div>`:`<button class="btn full" data-act="flip">Aufdecken</button>`}`;
+ ${flip?`<div class="rate">${[["✗ Falsch",0,"no"],["✓ Richtig",2,"ok"]].map(r=>`<button class="${r[2]}" data-act="rate" data-a="${r[1]}">${r[0]}<small>wieder in ${iv(r[1])}</small></button>`).join("")}</div>`:`<button class="btn full" data-act="flip">Aufdecken</button>`}`;
 }
 function vCards(){ const st=V.st; return progBar(st.j||0, st.cards.length, "vokabeln") + (st.cards.length ? cardUI(st) : `<div class="card" style="text-align:center"><div style="font-size:48px">✅</div><h3>Alles wiederholt!</h3><p class="mut">Gerade ist nichts fällig. Lerne neue Ausdrücke in einer Lektion.</p></div><button class="btn full" data-act="tab" data-a="vokabeln">Zurück</button>`); }
 function startCards(cards, onEnd){ V = {tab:"cards", st:{cards, j:0, flip:false, onEnd: onEnd || (()=>{ toast("Wiederholung abgeschlossen ✓"); go("vokabeln"); })}}; render(); }
 
 // ---------- Quiz ----------
 function makeQuiz(items, n, gramIds){
- const pool = allItems().filter(i=>!/[…]/.test(i.f));
+ // Falsche Antworten nur aus bekannten Wörtern: diese Lektion + schon gelernte; reicht das nicht, Lektionen bis zur aktuellen Woche
+ const ok = i => !/[…]/.test(i.f), w = curWeek();
+ const known = [...items, ...learnedItems()].filter(ok);
+ const upToNow = WEEKS.filter(x=>x.n<=w.n).flatMap(x=>x.lessons).flatMap(id=>lessonItems(id)).filter(ok);
  const qs = pick(items, Math.min(n, items.length)).map((it,k) => {
-  const others = pick(pool.filter(o=>o.key!==it.key && o.d!==it.d), 3);
+  const cand = p => [...new Map(p.filter(o=>o.key!==it.key && o.d!==it.d && o.f!==it.f).map(o=>[o.key,o])).values()];
+  let others = pick(cand(known), 3);
+  if (others.length < 3) others = others.concat(pick(cand(upToNow).filter(o=>!others.includes(o)), 3-others.length));
   if (k%3===2) return {q:`Wie sagt man „${it.d}\"?`, o: shuffle([it.f, ...others.map(o=>o.f)]), a: it.f, key: it.key, kind:"aktiv"};
   if (k%3===1) return {q:"Hör zu: Was bedeutet das?", audio:[it.key,it.p], o: shuffle([it.d, ...others.map(o=>o.d)]), a: it.d, key: it.key, kind:"hören"};
   return {q:`Was bedeutet „${it.f}\"?`, o: shuffle([it.d, ...others.map(o=>o.d)]), a: it.d, key: it.key, kind:"passiv"};
@@ -531,15 +551,23 @@ function vHoeren(){
  <h2>Unbekannter Dialog</h2><div class="card"><p>Die KI erstellt einen neuen Dialog mit deinen gelernten Wörtern – in neuem Zusammenhang, mit natürlichen Verkürzungen und Füllwörtern.</p>
  <button class="btn full tq" data-act="genDialog" ${AI_OK?"":"disabled"}>${V.genD?'<span class="spin"></span> Wird erstellt …':"✨ Neuen Dialog erstellen"}</button>${V.genDErr?`<div class="note red">${h(V.genDErr)}</div>`:""}${AI_OK?"":`<p class="sm mut">KI auf dem Server nicht eingerichtet.</p>`}</div>
  <h2>Dialoge aus deinen Lektionen</h2>
- ${ids.map(id=>{const L=getLesson(id); const last=[...S.listen].reverse().find(x=>x.id===id); return `<div class="week"><div class="dot ${last?"ok":""}">🎧</div><div style="flex:1"><div style="font-weight:800">${h(L.dialog.title)}</div><div class="sm mut">${h(L.title)}${last?" · zuletzt "+Math.round(last.s*100)+" %":""}</div></div><button class="btn small" data-act="listenEx" data-a="${id}">Hören</button><button class="btn small sec" data-act="shadow" data-a="${id}">Nachsprechen</button></div>`;}).join("")}
+ ${ids.map(id=>{const L=getLesson(id); const last=[...S.listen].reverse().find(x=>x.id===id); return `<div class="week"><div class="dot ${last?"ok":""}">🎧</div><div style="flex:1"><div style="font-weight:800">${h(L.dialog.title)}</div><div class="sm mut">${h(L.title)} · ${(()=>{const its=lessonItems(id); const k=its.filter(i=>S.srs["p:"+i.key]).length; return k+"/"+its.length+" Wörter gelernt";})()}${last?" · zuletzt "+Math.round(last.s*100)+" %":""}</div></div><button class="btn small" data-act="listenEx" data-a="${id}">Hören</button><button class="btn small sec" data-act="shadow" data-a="${id}">Nachsprechen</button></div>`;}).join("")}
  ${Object.keys(S.gen).filter(k=>k.startsWith("D")).map(id=>`<div class="week"><div class="dot">✨</div><div style="flex:1"><div style="font-weight:800">${h(S.gen[id].dialog.title)}</div><div class="sm mut">KI-generiert</div></div><button class="btn small" data-act="listenEx" data-a="${id}">Hören</button></div>`).join("")}`);
+}
+// strict: nur gelernte Wörter (Tagestraining). Sonst wenige neue, erschließbare Wörter erlaubt.
+async function makeDialog(strict){
+ const li = learnedItems();
+ const ctx = strict ? `Die Lernerin kennt NUR diese Ausdrücke: ${li.map(i=>i.f+" ("+i.d+")").join("; ")}.` : levelCtx();
+ const rule = strict ? `Verwende AUSSCHLIESSLICH diese Ausdrücke (leicht abgewandelt erlaubt, z. B. andere Person), dazu nur Vornamen und höchstens khob/are/na. KEINE anderen Wörter. Lieber kurz und einfach als ein unbekanntes Wort. ${li.length<12?"4–6":"6–8"} Zeilen.` : `Nutze überwiegend die gelernten Ausdrücke in NEUEN Situationen, höchstens 2–3 neue, leicht erschließbare Wörter. Natürliche Verkürzungen und Füllwörter (khob, yani, are dige) passend zum Niveau. 6–9 Zeilen.`;
+ const prompt = `Erstelle einen kurzen, realistischen Alltagsdialog in gesprochenem Teheraner Persisch für eine deutschsprachige Lernerin. ${ctx}
+${rule} 2 Sprecher mit iranischen Vornamen. Keine erfundenen Redewendungen – nur gebräuchliche Ausdrücke. ${TRANSLIT}
+NUR JSON: {"title":"kurzer deutscher Titel","lines":[["Sprechername","Umschrift","Deutsch","persische Schrift (umgangssprachlich)"]],"q":[["Verständnisfrage auf Deutsch",["Antwort A","Antwort B","Antwort C"],Index der richtigen Antwort 0-2]]} mit genau 3 Fragen.`;
+ const d = await ai(prompt); if (!d.lines || !d.q) throw new Error("ungültig");
+ const id="D"+Date.now().toString(36); S.gen[id]={id, title:"KI-Dialog", goal:"", items:[], dialog:d}; save(); return id;
 }
 async function genDialog(){
  V.genD=true; V.genDErr=null; render();
- const prompt = `Erstelle einen kurzen, realistischen Alltagsdialog in gesprochenem Teheraner Persisch für eine deutschsprachige Lernerin. ${levelCtx()}
-Nutze überwiegend die gelernten Ausdrücke in NEUEN Situationen, höchstens 2–3 neue, leicht erschließbare Wörter. Natürliche Verkürzungen und Füllwörter (khob, yani, are dige) passend zum Niveau. 6–9 Zeilen, 2 Sprecher mit iranischen Vornamen. Keine erfundenen Redewendungen – nur gebräuchliche Ausdrücke. ${TRANSLIT}
-NUR JSON: {"title":"kurzer deutscher Titel","lines":[["Sprechername","Umschrift","Deutsch","persische Schrift (umgangssprachlich)"]],"q":[["Verständnisfrage auf Deutsch",["Antwort A","Antwort B","Antwort C"],Index der richtigen Antwort 0-2]]} mit genau 3 Fragen.`;
- try { const d = await ai(prompt); if (!d.lines || !d.q) throw {}; const id="D"+Date.now().toString(36); S.gen[id]={id, title:"KI-Dialog", goal:"", items:[], dialog:d}; save(); V.genD=false; go("listenEx",{st:{id}}); }
+ try { const id = await makeDialog(false); V.genD=false; go("listenEx",{st:{id}}); }
  catch(e){ V.genD=false; V.genDErr=aiErr(e); render(); }
 }
 // Shadowing

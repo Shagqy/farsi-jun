@@ -16,7 +16,7 @@ items:[
 ["bebakhshid","Entschuldigung","ببخشید","Bebakhshid, dastshuyi kojâst?","Entschuldigung, wo ist die Toilette?","ببخشید، دستشویی کجاست؟","Zum Entschuldigen und um jemanden anzusprechen."],
 ["dastet dard nakone","Danke dir! (für eine Mühe)","دستت درد نکنه","Vây, dastet dard nakone!","Oh, vielen Dank dir!","وای، دستت درد نکنه!","Wörtlich: „Deine Hand soll nicht schmerzen\". Wenn jemand für dich gekocht oder etwas gemacht hat. Höflich: dastetun dard nakone."],
 ["khodâhâfez","Tschüss / Auf Wiedersehen","خداحافظ","Khob, man dige miram. Khodâhâfez!","Okay, ich geh dann. Tschüss!","خب، من دیگه میرم. خداحافظ!","Neutral, passt immer."],
-["felan","Bis dann!","فعلاً","Khob, felan!","Okay, bis dann!","خب، فعلاً!","Sehr locker, nur unter Freunden."],
+null, // entfernt: „felan“ war falsch. Platz bleibt frei, damit die Schlüssel der folgenden Ausdrücke gleich bleiben.
 ["sobh bekheyr","Guten Morgen","صبح بخیر","Sobh bekheyr mâmân!","Guten Morgen, Mama!","صبح بخیر مامان!","Morgens bis etwa Mittag."],
 ["shab bekheyr","Gute Nacht","شب بخیر","Shab bekheyr, khâbhâye khub bebini!","Gute Nacht, träum schön!","شب بخیر، خوابای خوب ببینی!","Zum Schlafengehen oder spät abends beim Abschied."]],
 dialog:{title:"Besuch bei Freunden", lines:[
